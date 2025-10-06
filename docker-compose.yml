@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  mysql-backup:
+    image: ghcr.io/${GITHUB_REPOSITORY}:latest
+    # Or use a specific version tag:
+    # image: ghcr.io/${GITHUB_REPOSITORY}:v1.0.0
+    container_name: mysql-telegram-backup
+    environment:
+      # Telegram Configuration
+      - BOT_TOKEN=${BOT_TOKEN}
+      - BOT_DEST=${BOT_DEST}
+      - CUST_MSG=${CUST_MSG:-MySQL Database Backup}
+      
+      # MySQL Configuration
+      - MYSQL_HOST=${MYSQL_HOST:-localhost}
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-}
+      
+      # Temporary Directory
+      - TMP_DIR=${TMP_DIR:-/tmp}
+    
+    # Uncomment for scheduled backups (runs daily at 2 AM)
+    # deploy:
+    #   restart_policy:
+    #     condition: on-failure
+    
+    # volumes:
+    #   - ./logs:/tmp/logs  # Optional: persist logs
+    
+    # network_mode: host  # Uncomment if MySQL is on localhost
+    
+    # If MySQL is in another container:
+    # networks:
+    #   - mysql-network
+
+# Uncomment if you need a custom network
+# networks:
+#   mysql-network:
+#     external: true
