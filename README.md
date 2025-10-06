@@ -20,53 +20,6 @@ A Python script that performs automated MySQL database backups and sends them to
 - A Telegram Bot Token
 - Your Telegram Chat ID
 
-### Installing MySQL Client Tools
-
-**Linux (Debian/Ubuntu):**
-
-```bash
-sudo apt-get update
-sudo apt-get install mysql-client
-```
-
-**Linux (Red Hat/CentOS):**
-
-```bash
-sudo yum install mysql
-```
-
-**Windows:**
-Download and install MySQL from [MySQL Downloads](https://dev.mysql.com/downloads/mysql/)
-
-**macOS:**
-
-```bash
-brew install mysql-client
-```
-
-## Installation
-
-1. Clone this repository:
-
-```bash
-git clone <repository-url>
-cd MySQL-Telegram-Backup
-```
-
-2. Install Python dependencies:
-
-```bash
-pip install -r requirements.txt
-```
-
-3. Copy `.env.example` to `.env` and configure your settings:
-
-```bash
-cp .env.example .env
-```
-
-4. Edit `.env` with your actual credentials
-
 ## Configuration
 
 Edit the `.env` file with your settings:
@@ -108,27 +61,35 @@ TMP_DIR=/tmp                                      # Temporary storage location
 https://api.telegram.org/bot<YourBOTToken>/getUpdates
 ```
 
-## Usage
+### MySQL User Permissions
 
-### Option 1: Direct Python Execution
+Ensure the MySQL user has the necessary permissions:
 
-Run the script manually:
+```sql
+-- 1. Create backup user
+CREATE USER 'mysql_backup'@'%' IDENTIFIED BY 'YourSecurePassword123!';
 
-```bash
-python mysql_telegram_backup.py
+-- 2. Grant necessary privileges for full backup with routines, triggers, and events
+GRANT SELECT, SHOW VIEW, TRIGGER, EVENT, ON *.* TO 'mysql_backup'@'%';
+
+-- 3. Apply changes
+FLUSH PRIVILEGES;
+
+-- 4. Verify
+SHOW GRANTS FOR 'mysql_backup'@'%';
 ```
 
-### Option 2: Docker (Recommended)
+## Usage
 
 The easiest way to run this backup is using Docker. Pre-built images are available on GitHub Container Registry.
 
-#### Pull the Docker image
+### Pull the Docker image
 
 ```bash
 docker pull ghcr.io/YOUR_USERNAME/mysql-telegram-backup:latest
 ```
 
-#### Run with Docker
+### Run with Docker
 
 ```bash
 docker run --rm \
@@ -141,7 +102,7 @@ docker run --rm \
   ghcr.io/YOUR_USERNAME/mysql-telegram-backup:latest
 ```
 
-#### Run with Docker Compose
+### Run with Docker Compose
 
 1. Create a `.env` file with your configuration
 2. Update `docker-compose.yml` with your GitHub username
@@ -151,39 +112,16 @@ docker run --rm \
 docker-compose up
 ```
 
-#### Scheduled Backups with Docker
+### Scheduled Backups with Docker
 
 Use a cron job to run the Docker container:
 
 ```bash
 # Add to crontab (crontab -e)
-0 2 * * * docker run --rm --env-file /path/to/.env ghcr.io/YOUR_USERNAME/mysql-telegram-backup:latest
+0 2 * * * docker run --network host --pull=always --rm --env-file /home/ubuntu/wavelog-backup.env ghcr.io/iu2frl/mysql-telegram-backup:latest
 ```
 
 Or use a container orchestrator like Kubernetes with CronJob.
-
-### Option 3: Automated Backups with Cron (Python)
-
-Add to your crontab for automated daily backups at 2 AM:
-
-```bash
-crontab -e
-```
-
-Add this line:
-
-```txt
-0 2 * * * cd /path/to/MySQL-Telegram-Backup && /usr/bin/python3 mysql_telegram_backup.py
-```
-
-### Building Docker Image Locally
-
-If you want to build the image yourself:
-
-```bash
-docker build -t mysql-telegram-backup .
-docker run --rm --env-file .env mysql-telegram-backup
-```
 
 ## Compression Details
 

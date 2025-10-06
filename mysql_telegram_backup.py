@@ -287,14 +287,14 @@ if __name__ == '__main__':
         logging.info("Starting MySQL backup process")
         
         # Test MySQL connection first
-        bot.send_message(TELEGRAM_DEST_CHAT, "🔍 Testing MySQL connection...")
+        logging.debug("Testing MySQL connection...")
         if not test_mysql_connection():
-            error_msg = "❌ Failed to connect to MySQL. Check credentials and connection."
+            error_msg = "Failed to connect to MySQL. Check credentials and connection."
             bot.send_message(TELEGRAM_DEST_CHAT, error_msg)
             logging.error(error_msg)
             raise Exception("MySQL connection test failed")
         
-        bot.send_message(TELEGRAM_DEST_CHAT, "✅ MySQL connection successful")
+        logging.info("MySQL connection successful")
         
         # Create temporary output path
         if not os.path.exists(TMP_DIR):
@@ -310,17 +310,17 @@ if __name__ == '__main__':
         compressed_file = os.path.join(TMP_DIR, f"mysql_{database_name}_{timestamp}.sql.xz")
         
         # Perform MySQL backup
-        bot.send_message(TELEGRAM_DEST_CHAT, "💾 Starting database backup...")
+        logging.info("Starting database backup...")
         if perform_mysql_backup(sql_file):
-            bot.send_message(TELEGRAM_DEST_CHAT, "✅ MySQL backup completed, starting compression...")
-            
+            logging.info("MySQL backup completed, starting compression...")
+
             # Compress the SQL file
             if compress_file_xz(sql_file, compressed_file):
-                bot.send_message(TELEGRAM_DEST_CHAT, "✅ Compression completed, sending file...")
+                logging.info("Compression completed, sending file...")
                 
                 # Send compressed file to Telegram
                 if send_file_to_telegram(compressed_file):
-                    bot.send_message(TELEGRAM_DEST_CHAT, "✅ Backup file sent successfully!")
+                    logging.info("Backup file sent successfully!")
                 else:
                     bot.send_message(TELEGRAM_DEST_CHAT, "❌ Failed to send backup file")
                 
