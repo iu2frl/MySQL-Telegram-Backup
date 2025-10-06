@@ -9,9 +9,13 @@ RUN apt-get update && \
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install Python dependencies
+# Create virtual environment
+RUN python -m venv /app/venv
+
+# Copy requirements and install Python dependencies in venv
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN /app/venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /app/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 # Copy the backup script
 COPY mysql_telegram_backup.py .
@@ -22,5 +26,8 @@ RUN mkdir -p /tmp/backup
 # Set environment variable for temporary directory
 ENV TMP_DIR=/tmp/backup
 
-# Run the backup script
+# Add venv to PATH so python commands use the venv
+ENV PATH="/app/venv/bin:$PATH"
+
+# Run the backup script using venv python
 CMD ["python", "-u", "mysql_telegram_backup.py"]
