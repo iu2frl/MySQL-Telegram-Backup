@@ -79,6 +79,62 @@ if not os.path.exists(TMP_DIR):
 logging.debug("TMP_DIR: [%s]", TMP_DIR)
 
 
+def test_mysql_connection():
+    """Test MySQL connection and privileges"""
+    logging.info("Testing MySQL connection...")
+    
+    try:
+        cmd = [
+            "mysql",
+            f"--host={MYSQL_HOST}",
+            f"--port={MYSQL_PORT}",
+            f"--user={MYSQL_USER}",
+            f"--password={MYSQL_PASSWORD}",
+            "-e", "SELECT 1;"
+        ]
+        
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=30
+        )
+        
+        if result.returncode == 0:
+            logging.info("MySQL connection successful")
+            
+            # Check privileges
+            priv_cmd = [
+                "mysql",
+                f"--host={MYSQL_HOST}",
+                f"--port={MYSQL_PORT}",
+                f"--user={MYSQL_USER}",
+                f"--password={MYSQL_PASSWORD}",
+                "-e", "SHOW GRANTS FOR CURRENT_USER();"
+            ]
+            
+            priv_result = subprocess.run(
+                priv_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=30
+            )
+            
+            if priv_result.returncode == 0:
+                logging.info("User privileges: %s", priv_result.stdout)
+            
+            return True
+        else:
+            logging.error("MySQL connection failed: [%s]", result.stderr)
+            return False
+            
+    except Exception as e:
+        logging.error("Failed to test MySQL connection: [%s]", str(e))
+        return False
+
+
 def perform_mysql_backup(output_file):
     """Perform MySQL backup using mysqldump"""
     logging.info("Starting MySQL backup to: [%s]", output_file)
@@ -96,7 +152,11 @@ def perform_mysql_backup(output_file):
             "--triggers",
             "--events",
             "--quick",
-            "--lock-tables=false"
+            "--lock-tables=false",
+            "--no-tablespaces",  # Avoid tablespace errors
+            "--skip-add-locks",  # Faster for InnoDB
+            "--complete-insert",  # More portable INSERT statements
+            "--hex-blob"  # Better binary data handling
         ]
         
         # Add database name if specified, otherwise backup all databases
@@ -104,6 +164,8 @@ def perform_mysql_backup(output_file):
             cmd.append(MYSQL_DATABASE)
         else:
             cmd.append("--all-databases")
+        
+        logging.debug("Executing command: %s", ' '.join([c if not c.startswith('--password') else '--password=***' for c in cmd]))
         
         # Execute mysqldump and save to file
         with open(output_file, 'w', encoding='utf-8') as f:
@@ -118,6 +180,18 @@ def perform_mysql_backup(output_file):
         if result.returncode == 0:
             file_size = os.path.getsize(output_file)
             logging.info("MySQL backup completed successfully. File size: [%d] bytes", file_size)
+            
+            # Log warnings if any (mysqldump might succeed with warnings)
+            if result.stderr:
+                logging.warning("mysqldump warnings: [%s]", result.stderr)
+            
+            # Check if file has actual data (not just structure)
+            if file_size < 1024:  # Less than 1KB is suspicious
+                logging.warning("Backup file is very small (%d bytes). This might indicate an empty backup.", file_size)
+                with open(output_file, 'r', encoding='utf-8') as f:
+                    content_preview = f.read(500)
+                    logging.debug("File preview: %s", content_preview)
+            
             return True
         else:
             logging.error("MySQL backup failed with return code [%d]: [%s]", 
@@ -212,6 +286,16 @@ if __name__ == '__main__':
         bot.send_message(TELEGRAM_DEST_CHAT, TELEGRAM_BACKUP_MESSAGE)
         logging.info("Starting MySQL backup process")
         
+        # Test MySQL connection first
+        bot.send_message(TELEGRAM_DEST_CHAT, "🔍 Testing MySQL connection...")
+        if not test_mysql_connection():
+            error_msg = "❌ Failed to connect to MySQL. Check credentials and connection."
+            bot.send_message(TELEGRAM_DEST_CHAT, error_msg)
+            logging.error(error_msg)
+            raise Exception("MySQL connection test failed")
+        
+        bot.send_message(TELEGRAM_DEST_CHAT, "✅ MySQL connection successful")
+        
         # Create temporary output path
         if not os.path.exists(TMP_DIR):
             logging.info("Creating temporary folder: [%s]", TMP_DIR)
@@ -226,6 +310,7 @@ if __name__ == '__main__':
         compressed_file = os.path.join(TMP_DIR, f"mysql_{database_name}_{timestamp}.sql.xz")
         
         # Perform MySQL backup
+        bot.send_message(TELEGRAM_DEST_CHAT, "💾 Starting database backup...")
         if perform_mysql_backup(sql_file):
             bot.send_message(TELEGRAM_DEST_CHAT, "✅ MySQL backup completed, starting compression...")
             
